@@ -1,6 +1,21 @@
 services:
-  # Development service
-  dev:
+  # Neon Database service
+  neon-local:
+    image: neondatabase/neon_local:latest
+    ports:
+      - '5432:5432'
+    env_file:
+      - ./.env.local
+    profiles:
+      - dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend service (Express.js)
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
@@ -18,16 +33,9 @@ services:
     command: npm run dev
     stdin_open: true
     tty: true
-
-  # Production service
-  prod:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - NODE_ENV=production
-    ports:
-      - "127.0.0.1:3000:3000"  # Only bind to localhost for security
-    restart: unless-stopped
-    # Uses default CMD from Dockerfile
+    depends_on:
+      neon-local:
+        condition: service_healthy
+    profiles:
+      - dev
 
