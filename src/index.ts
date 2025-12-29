@@ -21,7 +21,7 @@ app.use(cors());
 app.use(express.json());
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', message: 'Multi-agent workflow system is running' });
 });
 
@@ -30,7 +30,8 @@ app.post('/api/agents/web-search', async (req, res) => {
   try {
     const { query } = req.body;
     if (!query) {
-      return res.status(400).json({ error: 'Query is required' });
+      res.status(400).json({ error: 'Query is required' });
+      return;
     }
     const result = await webSearchAgent(query);
     res.json(result);
@@ -45,7 +46,8 @@ app.post('/api/agents/comparison', async (req, res) => {
   try {
     const { items } = req.body;
     if (!items || !Array.isArray(items) || items.length < 2) {
-      return res.status(400).json({ error: 'At least 2 items are required for comparison' });
+      res.status(400).json({ error: 'At least 2 items are required for comparison' });
+      return;
     }
     const result = await comparisonAgent(items);
     res.json(result);
@@ -60,7 +62,8 @@ app.post('/api/agents/recommendation', async (req, res) => {
   try {
     const { context, preferences } = req.body;
     if (!context) {
-      return res.status(400).json({ error: 'Context is required' });
+      res.status(400).json({ error: 'Context is required' });
+      return;
     }
     const result = await recommendationAgent(context, preferences);
     res.json(result);
@@ -75,7 +78,8 @@ app.post('/api/agents/newsletter', async (req, res) => {
   try {
     const { topics, style } = req.body;
     if (!topics || !Array.isArray(topics) || topics.length === 0) {
-      return res.status(400).json({ error: 'At least one topic is required' });
+      res.status(400).json({ error: 'At least one topic is required' });
+      return;
     }
     const result = await newsletterAgent(topics, style);
     res.json(result);

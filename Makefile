@@ -1,4 +1,4 @@
-.PHONY: help dev stop status setup-docker-env setup-check logs docker-down restart clean build pull-vercel-env
+.PHONY: help dev stop status setup-docker-env setup-check logs logs-follow logs-help docker-down restart clean build pull-vercel-env
 
 # Default target
 .DEFAULT_GOAL := help
@@ -90,15 +90,33 @@ status: ## Show status of running services
 		fi; \
 	done || true
 
-logs: ## Show Docker Compose logs
-	@echo "$(BLUE)📋 Docker Compose Logs$(NC)"
+logs: ## Show Docker Compose logs (use LOGS_SERVICE=backend or LOGS_SERVICE=neon-local for specific service)
+	@if [ -n "$(LOGS_SERVICE)" ]; then \
+		echo "$(BLUE)📋 Showing logs for $(LOGS_SERVICE)...$(NC)"; \
+		docker-compose --profile dev logs $(LOGS_SERVICE); \
+	else \
+		echo "$(BLUE)📋 Showing all Docker Compose logs...$(NC)"; \
+		docker-compose --profile dev logs; \
+	fi
+
+logs-follow: ## Follow Docker Compose logs in real-time (use LOGS_SERVICE=backend or LOGS_SERVICE=neon-local for specific service)
+	@if [ -n "$(LOGS_SERVICE)" ]; then \
+		echo "$(BLUE)📋 Following logs for $(LOGS_SERVICE)...$(NC)"; \
+		docker-compose --profile dev logs -f $(LOGS_SERVICE); \
+	else \
+		echo "$(BLUE)📋 Following all Docker Compose logs...$(NC)"; \
+		docker-compose --profile dev logs -f; \
+	fi
+
+logs-help: ## Show log viewing help and API examples
+	@echo "$(BLUE)📋 Docker Compose Logs Help$(NC)"
 	@echo ""
-	@echo "$(GREEN)To view all logs:$(NC)"
-	@echo "  docker-compose --profile dev logs -f"
-	@echo ""
-	@echo "$(GREEN)To view specific service logs:$(NC)"
-	@echo "  docker-compose --profile dev logs -f backend"
-	@echo "  docker-compose --profile dev logs -f neon-local"
+	@echo "$(GREEN)Available log commands:$(NC)"
+	@echo "  make logs                    - Show all logs"
+	@echo "  make logs-follow              - Follow all logs (live)"
+	@echo "  make logs LOGS_SERVICE=backend - Show backend logs"
+	@echo "  make logs LOGS_SERVICE=neon-local - Show neon-local logs"
+	@echo "  make logs-follow LOGS_SERVICE=backend - Follow backend logs"
 	@echo ""
 	@echo "$(GREEN)To check API responses:$(NC)"
 	@echo "  Health check:  curl http://localhost:$(BACKEND_PORT)/health"

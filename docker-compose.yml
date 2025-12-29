@@ -34,8 +34,9 @@ services:
     stdin_open: true
     tty: true
     depends_on:
-      neon-local:
-        condition: service_healthy
+      - neon-local
+    # Temporarily removed health check condition to allow backend to start
+    # even if database has connectivity issues
     profiles:
       - dev
 

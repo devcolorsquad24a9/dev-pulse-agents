@@ -90,7 +90,11 @@ The project uses Docker Compose with two services:
 - `make stop` - Stop all Docker Compose services
 - `make restart` - Restart all services
 - `make status` - Show status of running services
-- `make logs` - Show log viewing instructions and API examples
+- `make logs` - Show Docker Compose logs (all services)
+- `make logs LOGS_SERVICE=backend` - Show logs for a specific service
+- `make logs-follow` - Follow logs in real-time (all services)
+- `make logs-follow LOGS_SERVICE=backend` - Follow logs for a specific service
+- `make logs-help` - Show log viewing help and API examples
 - `make docker-down` - Stop services and remove containers
 - `make clean` - Remove containers, volumes, and built images
 - `make build` - Build Docker images without starting
@@ -101,7 +105,14 @@ The project uses Docker Compose with two services:
 # Start services
 docker-compose --profile dev up -d
 
-# View logs
+# View logs (using Makefile - recommended)
+make logs                    # Show all logs
+make logs-follow             # Follow all logs in real-time
+make logs LOGS_SERVICE=backend      # Show backend logs
+make logs LOGS_SERVICE=neon-local   # Show neon-local logs
+make logs-follow LOGS_SERVICE=backend # Follow backend logs
+
+# Or use docker-compose directly
 docker-compose --profile dev logs -f
 docker-compose --profile dev logs -f backend
 docker-compose --profile dev logs -f neon-local
