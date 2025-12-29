@@ -1,0 +1,156 @@
+
+To Do:
+Create devcolor repo [CHRIS]
+give admin access to fi, chris, audrey [CHRIS]
+Create devcolor vercel hobby account [FI]
+Building UI [AUDREY]
+Building web search agent [FI]
+Create DB for storage [FI]
+DB will store web search, comparison, recommendation
+DB with replacement (keep only the most up to date data)
+Web search should only check since last info stored in DB
+Building comparison agent [CHRIS]
+Access storage and llm create comparison
+Store comparison detail in db
+Building recommendation agent [AUDREY]
+Access the db, pull comparison, llm generate recommendation.
+Store rec in db. 
+Building newsletter agent [FI]
+Access the db, pull comparison, pull rec, & write everything in the newsletter template. 
+Schedule email sends of the newsletter. 
+Combine everything [ALL]
+Deploy [ALL]
+Test with example emails [ALL]
+
+Do we like any of these repo names
+dev-pulse-agents
+
+Comparison:
+IDEs
+
+Newsletter + Blog Writing Agent
+
+Initial scope
+Generate
+Web Search Agent https://ai-sdk.dev/cookbook/node/web-search-agent
+Each Tool - Complete Version History?
+
+Backlog
+
+
+ChatGPT Design 
+Summary (what you all agreed on)
+Build a newsletter product where users land on a site, opt in with email, and receive a weekly or monthly “tool updates + comparison” digest. The backend runs an agent that checks updates for a chosen category (start with top IDEs), compares them, pulls in supplemental non-vendor sources (because vendor changelogs can be biased/surface-level), and sends a clean “pros/cons + recommendation” email. Then you seed it with your squad’s emails, collect feedback, and expand distribution (DevColor, other Slack channels) and expand categories beyond IDEs.
+
+Agent Plan (MVP → scalable system)
+0) MVP scope (keep it tight)
+Category: IDEs only
+Tools to track (example set): VS Code, JetBrains (IntelliJ), Cursor, Visual Studio, Neovim (or replace with “Zed” depending on your target audience)
+Cadence: monthly first (less pressure), then weekly if it’s stable
+Output: 1 email per cycle with: updates, pros/cons, “who it’s for”, final recommendation
+
+The Agents (roles + inputs/outputs)
+Agent 1 — Source Collector (Update Harvester)
+Goal: gather new info since last run.
+Inputs: tool list + time window + known source URLs.
+Sources:
+Vendor changelogs / release notes (official)  * priority 
+
+
+Backlog Supplemental sources (non-vendor): GitHub releases, reputable blogs, dev newsletters, (Reddit/HN threads (lightly), issue trackers (signals), benchmark posts (when credible)
+Output (structured):
+Per tool: {highlights[], breaking_changes[], notable_fixes[], version, release_date, links[]}
+
+Backlog - Agent 2 — Credibility & De-bias Filter
+Goal: don’t let marketing fluff dominate.
+Logic:
+Prefer: official notes for facts (version/features), third-party for impact (stability, DX, complaints, perf)
+Down-rank: pure promo posts, vague claims with no evidence
+Output:
+“Evidence ledger” per tool with confidence tags: high/med/low, plus citations/links list.
+
+Agent 3 — Comparator (Pros/Cons + Tradeoffs)
+Goal: compare the set consistently.
+Comparison rubric (fixed headings):
+Speed/perf
+Language support & debugging
+Extensions/plugin ecosystem
+AI features (if relevant)
+Remote dev/containers
+Reliability/stability
+Pricing/licensing
+Best-fit personas (beginner, enterprise, polyglot, etc.)
+Output:
+A normalized comparison object + short “decision rules”
+
+Agent 4 — Recommender (Audience-aware) - High Priority
+Goal: make a recommendation that isn’t cringe.
+Inputs: comparator output + (optional) audience segment choices (e.g., “backend Python dev”, “student”, “enterprise team”).
+Output:
+“If you’re X, pick Y” recommendations
+“Avoid if…” caveats
+One default pick + 1–2 alternatives
+
+Agent 5 — Newsletter Writer (Formatter + Tone)
+Goal: turn structured data into an email people actually read.
+Output sections:
+TL;DR (5 bullets max)
+Biggest changes this cycle
+IDE-by-IDE updates (short)
+Comparison table in text form (no giant tables)
+Recommendation + who it’s for
+Links / references
+
+Agent 6 — QA / Safety / Hallucination Guard (Backlog)
+Goal: block bad sends.
+Checks:
+Every claim must map to a source link or be labeled “inference”
+No invented versions/dates
+No defamatory language (“X is trash”)—keep it professional
+Output: pass/fail + list of fixes.
+
+Orchestration Pipeline (end-to-end)
+Scheduler triggers run (weekly/monthly)
+Collector fetches sources → raw notes
+Filter scores credibility → evidence ledger
+Comparator builds rubric output
+Recommender generates picks
+Writer drafts newsletter
+QA validates claims + formatting
+Email sender dispatches to subscribers
+Store artifacts (newsletter HTML/text + structured JSON + sources) for future diffs
+
+Front-End/User Experience (simple but legit)
+Landing page
+“What you get” + example issue
+Category selector (MVP: IDEs only)
+Frequency choice (monthly/weekly)
+Email capture + consent checkbox
+Subscriber settings page (later) (Backlog)
+Pick categories (IDEs, UI frameworks, observability tools, etc.)
+Pick persona (student / backend / frontend / data)
+Unsubscribe link (mandatory)
+
+Prompting approach (practical, not fancy)
+Use strict JSON contracts between agents so you can debug.
+Collector prompt pattern
+“Return only JSON. Include version/date only if explicitly stated in sources. Provide links.”
+Comparator prompt pattern
+“Use this fixed rubric. If no evidence, say ‘unknown’.”
+Writer prompt pattern
+“Write for software engineers. No marketing tone. Short paragraphs. Bullet-heavy. Link the sources at the end.”
+
+Expansion path (after IDE MVP works)
+Categories: UI frameworks, observability (Datadog/Grafana/New Relic), CI/CD (GitHub Actions/CircleCI), code assistants (Copilot/Cursor/Claude Code), DBs, queues, etc.
+Add “What changed since last issue” diffs
+Add personalization by persona + stack
+
+Build order (fastest path)
+Hardcode IDE list + source URLs
+Implement Collector + Writer + QA (skip fancy recommender initially)
+Ship monthly newsletter to your squad
+Add Filter + Comparator once you see noise/bias
+Add category expansion + personalization
+If you want, I can also spit out: the exact JSON schemas for each agent boundary + a minimal set of prompts you can paste directly into your orchestrator.
+
+
