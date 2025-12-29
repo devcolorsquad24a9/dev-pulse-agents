@@ -1,0 +1,33 @@
+services:
+  # Development service
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      # Mount source for hot reload
+      - ./src:/app/src
+      # Preserve node_modules from container (don't override)
+      - /app/node_modules
+      # Mount dist if you want to see compiled output
+      - ./dist:/app/dist
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    command: npm run dev
+    stdin_open: true
+    tty: true
+
+  # Production service
+  prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "127.0.0.1:3000:3000"  # Only bind to localhost for security
+    restart: unless-stopped
+    # Uses default CMD from Dockerfile
+
