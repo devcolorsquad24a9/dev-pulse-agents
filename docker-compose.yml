@@ -40,3 +40,14 @@ services:
     profiles:
       - dev
 
+  # Flyway service for database migrations
+  flyway:
+    image: flyway/flyway:latest
+    volumes:
+      - ./flyway/conf:/flyway/conf
+      - ./flyway/sql:/flyway/sql
+    profiles:
+      - migrations
+    # No network needed - connects directly to remote Neon databases
+    command: ["info"]  # Default command, override when running migrations
+

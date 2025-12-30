@@ -1,4 +1,4 @@
-.PHONY: help dev stop status setup-docker-env setup-check logs logs-follow logs-help docker-down restart clean build pull-vercel-env
+.PHONY: help dev stop status setup-docker-env setup-check logs logs-follow logs-help docker-down restart clean build pull-vercel-env neon-setup neon-branch-preview-create neon-connection-strings migrate-preview migrate-production migrate-info migrate-clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -6,6 +6,7 @@
 # Variables
 BACKEND_PORT := 3000
 DB_PORT := 5432
+NEON_PROJECT_ID ?= $(shell neonctl projects list --output json 2>/dev/null | jq -r '.[0].id' 2>/dev/null || echo "")
 
 # Colors for output
 GREEN := \033[0;32m
@@ -170,4 +171,106 @@ pull-vercel-env: ## Pull environment variables from Vercel to .env.local
 		echo "$(GREEN)✅ Environment variables pulled from Vercel$(NC)"; \
 	fi
 	@echo "$(BLUE)   File: .env.local$(NC)"
+
+# Neon CLI Commands
+neon-setup: ## Setup Neon CLI authentication
+	@echo "$(BLUE)🔐 Setting up Neon CLI...$(NC)"
+	@if ! command -v neonctl >/dev/null 2>&1; then \
+		echo "$(YELLOW)❌ Neon CLI not found$(NC)"; \
+		echo "$(YELLOW)   Install with: npm install -g neonctl$(NC)"; \
+		echo "$(YELLOW)   Or: brew install neonctl$(NC)"; \
+		exit 1; \
+	fi
+	@neonctl auth
+	@echo "$(GREEN)✅ Neon CLI authenticated$(NC)"
+
+neon-branch-preview-create: ## Create preview branch from main (for local dev and preview deployments)
+	@echo "$(BLUE)🌿 Creating preview branch from main...$(NC)"
+	@if ! command -v neonctl >/dev/null 2>&1; then \
+		echo "$(YELLOW)❌ Neon CLI not found. Run: make neon-setup$(NC)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(NEON_PROJECT_ID)" ]; then \
+		echo "$(YELLOW)⚠️  NEON_PROJECT_ID not set$(NC)"; \
+		echo "$(BLUE)💡 Usage: make neon-branch-preview-create NEON_PROJECT_ID=your-project-id$(NC)"; \
+		echo "$(BLUE)   Or set it: export NEON_PROJECT_ID=your-project-id$(NC)"; \
+		exit 1; \
+	fi
+	@neonctl branches create --name preview --parent main --project-id $(NEON_PROJECT_ID) || \
+		echo "$(YELLOW)⚠️  Preview branch may already exist$(NC)"
+	@echo "$(GREEN)✅ Preview branch created$(NC)"
+	@echo "$(BLUE)📋 Next: Get connection strings with: make neon-connection-strings$(NC)"
+
+neon-connection-strings: ## Get connection strings for main and preview branches
+	@if [ -z "$(NEON_PROJECT_ID)" ]; then \
+		echo "$(YELLOW)⚠️  NEON_PROJECT_ID not set$(NC)"; \
+		echo "$(BLUE)💡 Usage: make neon-connection-strings NEON_PROJECT_ID=your-project-id$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)📋 Connection Strings:$(NC)"
+	@echo ""
+	@echo "$(GREEN)Main (Production):$(NC)"
+	@neonctl connection-string main --project-id $(NEON_PROJECT_ID) || true
+	@echo ""
+	@echo "$(GREEN)Preview (Local Dev & Preview Deployments):$(NC)"
+	@neonctl connection-string preview --project-id $(NEON_PROJECT_ID) || true
+	@echo ""
+	@echo "$(BLUE)💡 Copy these to .env.production and .env.preview files$(NC)"
+	@echo "$(BLUE)   Format for .env.preview and .env.production:$(NC)"
+	@echo "   FLYWAY_URL=jdbc:postgresql://host:5432/neondb?sslmode=require"
+	@echo "   FLYWAY_USER=your_user"
+	@echo "   FLYWAY_PASSWORD=your_password"
+
+# Flyway Migration Commands
+migrate-preview: ## Run migrations on preview branch
+	@echo "$(BLUE)🔄 Running migrations on preview branch...$(NC)"
+	@if [ ! -f ".env.preview" ]; then \
+		echo "$(YELLOW)❌ .env.preview not found$(NC)"; \
+		echo "$(YELLOW)   Create it with connection string from: make neon-connection-strings$(NC)"; \
+		exit 1; \
+	fi
+	@docker-compose --profile migrations run --rm \
+		--env-file .env.preview \
+		flyway migrate -configFiles="/flyway/conf/env_preview.conf"
+
+migrate-production: ## Run migrations on production (main) branch
+	@echo "$(YELLOW)⚠️  Running migrations on PRODUCTION (main branch)...$(NC)"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		if [ ! -f ".env.production" ]; then \
+			echo "$(YELLOW)❌ .env.production not found$(NC)"; \
+			exit 1; \
+		fi; \
+		docker-compose --profile migrations run --rm \
+			--env-file .env.production \
+			flyway migrate -configFiles="/flyway/conf/env_production.conf"; \
+	else \
+		echo "$(YELLOW)Cancelled$(NC)"; \
+	fi
+
+migrate-info: ## Show migration status for preview branch
+	@if [ ! -f ".env.preview" ]; then \
+		echo "$(YELLOW)❌ .env.preview not found$(NC)"; \
+		exit 1; \
+	fi
+	@docker-compose --profile migrations run --rm \
+		--env-file .env.preview \
+		flyway info -configFiles="/flyway/conf/env_preview.conf"
+
+migrate-clean: ## Clean migration history (use with caution! Development only)
+	@echo "$(YELLOW)⚠️  This will clean migration history. Use only for development!$(NC)"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		if [ ! -f ".env.preview" ]; then \
+			echo "$(YELLOW)❌ .env.preview not found$(NC)"; \
+			exit 1; \
+		fi; \
+		docker-compose --profile migrations run --rm \
+			--env-file .env.preview \
+			flyway clean -configFiles="/flyway/conf/env_preview.conf"; \
+	else \
+		echo "$(YELLOW)Cancelled$(NC)"; \
+	fi
 
