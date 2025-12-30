@@ -5,7 +5,7 @@ Multi-agent workflow system using Vercel AI SDK with Express.js backend
 ## Overview
 
 This project provides a multi-agent system built with the Vercel AI SDK, featuring:
-- **Web Search Agent** - Performs web searches and retrieves relevant information
+- **Web Search Agent** - Scrapes tool changelogs, stores them in Vercel Blob, generates embeddings, and enables semantic search across changelogs using pgvector
 - **Comparison Agent** - Compares multiple items, products, or concepts
 - **Recommendation Agent** - Provides personalized recommendations based on user preferences
 - **Newsletter Agent** - Generates newsletter content based on topics and preferences
@@ -15,8 +15,41 @@ This project provides a multi-agent system built with the Vercel AI SDK, featuri
 - Node.js 20+
 - Docker and Docker Compose
 - Make (optional, for convenience commands)
+- Neon CLI (for database branch management) - Install with `npm install -g neonctl` or `brew install neonctl`
 
 ## Quick Start
+
+### Initial Setup (First Time Only)
+
+1. **Setup Neon CLI and create database branches:**
+```bash
+# Install Neon CLI (if not already installed)
+npm install -g neonctl
+# or
+brew install neonctl
+
+# Authenticate with Neon
+make neon-setup
+
+# Create preview branch from main (for local dev and preview deployments)
+make neon-branch-preview-create NEON_PROJECT_ID=your-project-id
+
+# Get connection strings for both branches
+make neon-connection-strings NEON_PROJECT_ID=your-project-id
+```
+
+2. **Create environment files:**
+   - Create `.env.preview` with preview branch connection string (format shown in output)
+   - Create `.env.production` with main branch connection string (format shown in output)
+
+3. **Run initial database migrations:**
+```bash
+# Run migrations on preview branch (safe for testing)
+make migrate-preview
+
+# Run migrations on production (requires confirmation)
+make migrate-production
+```
 
 ### Using Makefile (Recommended)
 
@@ -82,6 +115,7 @@ The project uses Docker Compose with two services:
 
 ### Available Makefile Commands
 
+#### Development Commands
 - `make help` - Show all available commands
 - `make setup-docker-env` - Create/update `.env.local` with Neon Local DATABASE_URL
 - `make setup-check` - Check if environment files are set up correctly
@@ -98,6 +132,17 @@ The project uses Docker Compose with two services:
 - `make docker-down` - Stop services and remove containers
 - `make clean` - Remove containers, volumes, and built images
 - `make build` - Build Docker images without starting
+
+#### Neon CLI Commands
+- `make neon-setup` - Setup and authenticate Neon CLI
+- `make neon-branch-preview-create NEON_PROJECT_ID=xxx` - Create preview branch from main
+- `make neon-connection-strings NEON_PROJECT_ID=xxx` - Get connection strings for all branches
+
+#### Database Migration Commands
+- `make migrate-preview` - Run migrations on preview branch
+- `make migrate-production` - Run migrations on production (main) branch (requires confirmation)
+- `make migrate-info` - Show migration status for preview branch
+- `make migrate-clean` - Clean migration history (development only, use with caution!)
 
 ### Docker Compose Commands
 
@@ -134,12 +179,33 @@ GET /health
 ```
 
 ### Web Search Agent
+
+The Web Search Agent processes tool changelogs by scraping, storing in Vercel Blob, and creating vector embeddings for semantic search.
+
+#### Process Changelogs
+Scrapes changelogs from provided tools, stores them in Vercel Blob, and generates embeddings:
 ```bash
-POST /api/agents/web-search
+POST /api/agents/web-search/process
 Content-Type: application/json
 
 {
-  "query": "your search query"
+  "tools": [
+    {"name": "cursor", "url": "https://cursor.com/changelog"},
+    {"name": "windsurf", "url": "https://windsurf.com/changelog"}
+  ]
+}
+```
+
+#### Search Changelogs
+Performs semantic search across stored changelog embeddings:
+```bash
+POST /api/agents/web-search/search
+Content-Type: application/json
+
+{
+  "query": "What new features were added?",
+  "toolName": "cursor",  // optional: filter by tool
+  "limit": 10           // optional: default 10
 }
 ```
 
@@ -183,10 +249,19 @@ Content-Type: application/json
 # Health check
 curl http://localhost:3000/health
 
-# Web search
-curl -X POST http://localhost:3000/api/agents/web-search \
+# Process changelogs
+curl -X POST http://localhost:3000/api/agents/web-search/process \
   -H "Content-Type: application/json" \
-  -d '{"query": "latest AI developments"}'
+  -d '{
+    "tools": [
+      {"name": "cursor", "url": "https://cursor.com/changelog"}
+    ]
+  }'
+
+# Search changelogs
+curl -X POST http://localhost:3000/api/agents/web-search/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What new features were added?", "limit": 5}'
 
 # Comparison
 curl -X POST http://localhost:3000/api/agents/comparison \
@@ -209,14 +284,28 @@ curl -X POST http://localhost:3000/api/agents/newsletter \
 ```
 src/
   agents/              # Agent implementations
-    webSearchAgent.ts   # Web search functionality
+    webSearchAgent.ts   # Changelog scraping, storage, and semantic search
     comparisonAgent.ts # Comparison functionality
     recommendationAgent.ts # Recommendation functionality
     newsletterAgent.ts # Newsletter generation
     index.ts           # Agent exports
-  tools/               # Shared tools (to be added)
+  tools/               # Shared tools
+    scraper.ts         # Firecrawl web scraping
+    embeddings.ts      # OpenAI text embedding generation
+  storage/             # Storage modules
+    blob.ts            # Vercel Blob storage operations
+  db/                  # Database modules
+    client.ts          # PostgreSQL client connection
+    vectorStore.ts     # Vector store operations (pgvector)
   workflows/           # Workflow definitions (to be added)
   index.ts             # Express.js server entry point
+flyway/
+  conf/                # Flyway configuration files
+    flyway.conf        # Base configuration
+    env_preview.conf   # Preview branch configuration
+    env_production.conf # Production branch configuration
+  sql/                 # Database migration files
+    V1__Enable_pgvector.sql  # Initial migration (pgvector extension)
 ```
 
 ## Environment Variables
@@ -250,7 +339,7 @@ vercel login
 Create a `.env.local` file in the project root:
 
 ```env
-# Database (for Neon Local)
+# Database (for Neon Local - connects to preview branch)
 DATABASE_URL=postgresql://neon:npg@neon-local:5432/neondb?sslmode=no-verify
 
 # AI Provider API Keys
@@ -258,10 +347,36 @@ OPENAI_API_KEY=your_openai_api_key
 ANTHROPIC_API_KEY=your_anthropic_api_key  # optional
 GOOGLE_API_KEY=your_google_api_key        # optional
 
+# Web Scraping
+FIRECRAWL_API_KEY=your_firecrawl_api_key
+
+# Storage
+BLOB_READ_WRITE_TOKEN=your_vercel_blob_token
+
 # Server
 PORT=3000
 NODE_ENV=development
 ```
+
+### Database Migration Environment Files
+
+For Flyway migrations, create `.env.preview` and `.env.production` files:
+
+**`.env.preview`** (for preview branch migrations):
+```env
+FLYWAY_URL=jdbc:postgresql://ep-xxx-xxx.us-east-1.aws.neon.tech:5432/neondb?sslmode=require
+FLYWAY_USER=your_user
+FLYWAY_PASSWORD=your_password
+```
+
+**`.env.production`** (for production/main branch migrations):
+```env
+FLYWAY_URL=jdbc:postgresql://ep-yyy-yyy.us-east-1.aws.neon.tech:5432/neondb?sslmode=require
+FLYWAY_USER=your_user
+FLYWAY_PASSWORD=your_password
+```
+
+Get connection strings using: `make neon-connection-strings NEON_PROJECT_ID=your-project-id`
 
 ## Managing Dependencies
 
@@ -337,17 +452,90 @@ The Docker development setup uses `tsx watch` which automatically reloads when y
 
 ## Database
 
-The project uses **Neon Local** for local database development. Neon Local connects to your Neon cloud database and provides a local PostgreSQL instance.
+The project uses **Neon** for database hosting with **Neon Local** for local development. Database schema changes are managed using **Flyway** migrations.
+
+### Database Branch Strategy
+
+- **Main Branch**: Production database
+- **Preview Branch**: Shared between local development (via Neon Local) and preview deployments (e.g., Vercel previews)
+
+This setup ensures:
+- Local development and preview deployments are isolated from production
+- Consistent schema management across all environments
+- Safe testing of migrations before applying to production
+
+### Neon Local
+
+Neon Local connects to your Neon cloud database and provides a local PostgreSQL instance.
 
 - **Port**: 5432
-- **Connection**: Managed via `DATABASE_URL` in `.env.local`
+- **Connection**: Managed via `DATABASE_URL` in `.env.local` (points to `neon-local:5432`)
 - **Health Check**: Automatically configured in docker-compose.yml
+- **Target**: Configured to proxy to the preview branch via `BRANCH_ID` environment variable
+- **Configuration**: The `BRANCH_ID` in `docker-compose.yml` specifies which Neon branch to connect to
+
+### Database Migrations
+
+Database schema changes are managed using Flyway. Migration files are located in `flyway/sql/` and follow the naming convention `V<version>__<description>.sql`.
+
+**Running Migrations:**
+
+```bash
+# Test migrations on preview branch first
+make migrate-preview
+
+# Apply to production (requires confirmation)
+make migrate-production
+
+# Check migration status
+make migrate-info
+```
+
+**Creating New Migrations:**
+
+1. Create a new file in `flyway/sql/` following the naming convention:
+   - Example: `V2__Create_users_table.sql`
+2. Test on preview branch: `make migrate-preview`
+3. Apply to production: `make migrate-production`
+
+See `flyway/README.md` for more detailed migration documentation.
+
+## Web Search Agent Details
+
+The Web Search Agent implements a complete changelog processing and search pipeline:
+
+1. **Scraping**: Uses Firecrawl to scrape changelog pages and extract content
+2. **Storage**: Stores scraped content in Vercel Blob storage (organized by environment: `dev/` or `prod/`)
+3. **Change Detection**: Uses content hashing to detect when changelogs have been updated
+4. **Embedding Generation**: Chunks text and generates embeddings using OpenAI's `text-embedding-3-small` model
+5. **Vector Storage**: Stores embeddings in Neon database using pgvector extension
+6. **Semantic Search**: Performs cosine similarity search across all stored changelog embeddings
+
+### Database Schema
+
+The `changelog_embeddings` table stores:
+- Tool name and URL
+- Content chunks with their embeddings (1536 dimensions)
+- Metadata (JSONB) for additional information
+- Blob storage path for reference
+- Timestamps for tracking updates
+
+### Vector Search
+
+The search endpoint uses cosine similarity to find the most relevant changelog content. Results are filtered by similarity threshold (>0.7) and can be optionally filtered by tool name.
 
 ## Resources
 
 - [Vercel AI SDK Documentation](https://sdk.vercel.ai/docs)
 - [Web Search Agent Cookbook](https://ai-sdk.dev/cookbook/node/web-search-agent)
+- [Embed Text Cookbook](https://ai-sdk.dev/cookbook/node/embed-text)
 - [Neon Local Documentation](https://neon.tech/docs/guides/neon-local)
+- [Neon Branching Guide](https://neon.com/docs/guides/branching-neon-cli)
+- [Neon pgvector Extension](https://neon.com/docs/extensions/pgvector)
+- [Flyway Documentation](https://flywaydb.org/documentation/)
+- [Neon Flyway Multiple Environments](https://neon.com/docs/guides/flyway-multiple-environments)
+- [Firecrawl Documentation](https://docs.firecrawl.dev/)
+- [Vercel Blob Storage](https://vercel.com/docs/storage/vercel-blob)
 
 ## License
 

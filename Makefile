@@ -1,4 +1,4 @@
-.PHONY: help dev stop status setup-docker-env setup-check logs logs-follow logs-help docker-down restart clean build pull-vercel-env neon-setup neon-branch-preview-create neon-connection-strings migrate-preview migrate-production migrate-info migrate-clean
+.PHONY: help dev stop status setup-docker-env setup-check logs logs-follow logs-help docker-down restart clean build pull-vercel-env add-env-var neon-setup neon-branch-preview-create neon-connection-strings migrate-preview migrate-production migrate-info migrate-clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -38,7 +38,7 @@ setup-check: ## Check if environment files are set up correctly
 	fi
 	@echo ""
 
-setup-docker-env: ## Ensure .env.local exists with correct DATABASE_URL for Neon Local
+setup-docker-env: ## Ensure .env.local exists with correct DATABASE_URL for Neon Local (preview branch)
 	@echo "$(BLUE)🔧 Setting up Docker environment file...$(NC)"
 	@if [ ! -f ".env.local" ]; then \
 		echo "$(YELLOW)⚠️  .env.local not found. Creating minimal .env.local...$(NC)"; \
@@ -47,8 +47,12 @@ setup-docker-env: ## Ensure .env.local exists with correct DATABASE_URL for Neon
 	else \
 		echo "$(GREEN)✅ .env.local exists$(NC)"; \
 		if grep -q "^DATABASE_URL=" .env.local; then \
-			sed -i '' 's|^DATABASE_URL=.*|DATABASE_URL=postgresql://neon:npg@neon-local:5432/neondb?sslmode=no-verify|' .env.local; \
-			echo "$(GREEN)   Updated DATABASE_URL for Neon Local$(NC)"; \
+			if ! grep -q "ep-calm-lake-ahc8d6st" .env.local; then \
+				sed -i '' 's|^DATABASE_URL=.*|DATABASE_URL=postgresql://neon:npg@neon-local:5432/neondb?sslmode=no-verify|' .env.local; \
+				echo "$(GREEN)   Updated DATABASE_URL for Neon Local (preview branch)$(NC)"; \
+			else \
+				echo "$(BLUE)   DATABASE_URL already configured for preview branch$(NC)"; \
+			fi; \
 		else \
 			echo "DATABASE_URL=postgresql://neon:npg@neon-local:5432/neondb?sslmode=no-verify" >> .env.local; \
 			echo "$(GREEN)   Added DATABASE_URL for Neon Local$(NC)"; \
@@ -56,6 +60,7 @@ setup-docker-env: ## Ensure .env.local exists with correct DATABASE_URL for Neon
 	fi
 	@echo "$(GREEN)✅ Docker environment file ready!$(NC)"
 	@echo "$(BLUE)   File: .env.local$(NC)"
+	@echo "$(BLUE)   Note: Neon Local is configured to proxy to preview branch$(NC)"
 
 dev: setup-docker-env ## Start backend and Neon Local database with Docker Compose
 	@echo "$(BLUE)🐳 Starting services with Docker Compose + Neon Local...$(NC)"
@@ -172,6 +177,51 @@ pull-vercel-env: ## Pull environment variables from Vercel to .env.local
 	fi
 	@echo "$(BLUE)   File: .env.local$(NC)"
 
+add-env-var: ## Add environment variable to Vercel project (usage: make add-env-var KEY=var_name VALUE=var_value [ENV=development|preview|production])
+	@echo "$(BLUE)➕ Adding environment variable to Vercel project...$(NC)"
+	@if ! command -v vercel >/dev/null 2>&1; then \
+		echo "$(YELLOW)❌ Vercel CLI not found$(NC)"; \
+		echo "$(YELLOW)   Install it with: npm install -g vercel$(NC)"; \
+		echo "$(YELLOW)   Or: brew install vercel-cli$(NC)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(KEY)" ]; then \
+		echo "$(YELLOW)❌ KEY is required$(NC)"; \
+		echo "$(BLUE)💡 Usage: make add-env-var KEY=VAR_NAME VALUE=var_value [ENV=development|preview|production]$(NC)"; \
+		echo "$(BLUE)   Examples:$(NC)"; \
+		echo "$(BLUE)     # Add to all environments (non-interactive):$(NC)"; \
+		echo "$(BLUE)     make add-env-var KEY=FIRECRAWL_API_KEY VALUE=fc-...$(NC)"; \
+		echo "$(BLUE)     # Add to specific environment (non-interactive):$(NC)"; \
+		echo "$(BLUE)     make add-env-var KEY=OPENAI_API_KEY ENV=production VALUE=sk-...$(NC)"; \
+		echo "$(BLUE)   $(NC)"; \
+		echo "$(YELLOW)⚠️  Warning: VALUE may be saved in shell history$(NC)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(VALUE)" ]; then \
+		echo "$(YELLOW)❌ VALUE is required for non-interactive mode$(NC)"; \
+		echo "$(BLUE)💡 Usage: make add-env-var KEY=VAR_NAME VALUE=var_value [ENV=development|preview|production]$(NC)"; \
+		echo "$(BLUE)   Examples:$(NC)"; \
+		echo "$(BLUE)     # Add to all environments:$(NC)"; \
+		echo "$(BLUE)     make add-env-var KEY=FIRECRAWL_API_KEY VALUE=fc-...$(NC)"; \
+		echo "$(BLUE)     # Add to specific environment:$(NC)"; \
+		echo "$(BLUE)     make add-env-var KEY=OPENAI_API_KEY ENV=production VALUE=sk-...$(NC)"; \
+		exit 1; \
+	fi
+	@if [ -n "$(ENV)" ]; then \
+		echo "$(BLUE)   Adding $(KEY) to $(ENV) environment...$(NC)"; \
+		echo "$(VALUE)" | vercel env add $(KEY) $(ENV) --force; \
+	else \
+		echo "$(BLUE)   Running interactive mode to add $(KEY) to all environments...$(NC)"; \
+		echo "$(BLUE)   You'll be prompted to:$(NC)"; \
+		echo "$(BLUE)     1. Enter value: $(VALUE)$(NC)"; \
+		echo "$(BLUE)     2. Select all environments (Production, Preview, Development)$(NC)"; \
+		echo "$(BLUE)     3. Mark as sensitive? (choose 'n' or 'y')$(NC)"; \
+		echo ""; \
+		vercel env add $(KEY) --force; \
+	fi
+	@echo "$(GREEN)✅ Environment variable added to Vercel project$(NC)"
+	@echo "$(BLUE)💡 To pull updated variables to local: make pull-vercel-env$(NC)"
+
 # Neon CLI Commands
 neon-setup: ## Setup Neon CLI authentication
 	@echo "$(BLUE)🔐 Setting up Neon CLI...$(NC)"
@@ -229,9 +279,11 @@ migrate-preview: ## Run migrations on preview branch
 		echo "$(YELLOW)   Create it with connection string from: make neon-connection-strings$(NC)"; \
 		exit 1; \
 	fi
-	@docker-compose --profile migrations run --rm \
+	@docker run --rm \
+		-v $(PWD)/flyway/conf:/flyway/conf \
+		-v $(PWD)/flyway/sql:/flyway/sql \
 		--env-file .env.preview \
-		flyway migrate -configFiles="/flyway/conf/env_preview.conf"
+		flyway/flyway:latest migrate -configFiles="/flyway/conf/env_preview.conf"
 
 migrate-production: ## Run migrations on production (main) branch
 	@echo "$(YELLOW)⚠️  Running migrations on PRODUCTION (main branch)...$(NC)"
@@ -242,9 +294,11 @@ migrate-production: ## Run migrations on production (main) branch
 			echo "$(YELLOW)❌ .env.production not found$(NC)"; \
 			exit 1; \
 		fi; \
-		docker-compose --profile migrations run --rm \
+		docker run --rm \
+			-v $(PWD)/flyway/conf:/flyway/conf \
+			-v $(PWD)/flyway/sql:/flyway/sql \
 			--env-file .env.production \
-			flyway migrate -configFiles="/flyway/conf/env_production.conf"; \
+			flyway/flyway:latest migrate -configFiles="/flyway/conf/env_production.conf"; \
 	else \
 		echo "$(YELLOW)Cancelled$(NC)"; \
 	fi
@@ -254,9 +308,11 @@ migrate-info: ## Show migration status for preview branch
 		echo "$(YELLOW)❌ .env.preview not found$(NC)"; \
 		exit 1; \
 	fi
-	@docker-compose --profile migrations run --rm \
+	@docker run --rm \
+		-v $(PWD)/flyway/conf:/flyway/conf \
+		-v $(PWD)/flyway/sql:/flyway/sql \
 		--env-file .env.preview \
-		flyway info -configFiles="/flyway/conf/env_preview.conf"
+		flyway/flyway:latest info -configFiles="/flyway/conf/env_preview.conf"
 
 migrate-clean: ## Clean migration history (use with caution! Development only)
 	@echo "$(YELLOW)⚠️  This will clean migration history. Use only for development!$(NC)"
@@ -267,9 +323,11 @@ migrate-clean: ## Clean migration history (use with caution! Development only)
 			echo "$(YELLOW)❌ .env.preview not found$(NC)"; \
 			exit 1; \
 		fi; \
-		docker-compose --profile migrations run --rm \
+		docker run --rm \
+			-v $(PWD)/flyway/conf:/flyway/conf \
+			-v $(PWD)/flyway/sql:/flyway/sql \
 			--env-file .env.preview \
-			flyway clean -configFiles="/flyway/conf/env_preview.conf"; \
+			flyway/flyway:latest clean -configFiles="/flyway/conf/env_preview.conf"; \
 	else \
 		echo "$(YELLOW)Cancelled$(NC)"; \
 	fi
