@@ -8,6 +8,8 @@ import express from 'express';
 import cors from 'cors';
 import {
   webSearchAgent,
+  processChangelogs,
+  searchChangelogs,
   comparisonAgent,
   recommendationAgent,
   newsletterAgent,
@@ -25,7 +27,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', message: 'Multi-agent workflow system is running' });
 });
 
-// Web Search Agent endpoint
+// Web Search Agent endpoints
 app.post('/api/agents/web-search', async (req, res) => {
   try {
     const { query } = req.body;
@@ -38,6 +40,38 @@ app.post('/api/agents/web-search', async (req, res) => {
   } catch (error) {
     console.error('Web search agent error:', error);
     res.status(500).json({ error: 'Failed to perform web search' });
+  }
+});
+
+// Process changelogs from tools
+app.post('/api/agents/web-search/process', async (req, res) => {
+  try {
+    const { tools } = req.body;
+    if (!tools || !Array.isArray(tools)) {
+      res.status(400).json({ error: 'Tools array is required' });
+      return;
+    }
+    const result = await processChangelogs(tools);
+    res.json(result);
+  } catch (error) {
+    console.error('Changelog processing error:', error);
+    res.status(500).json({ error: 'Failed to process changelogs' });
+  }
+});
+
+// Search changelogs using semantic search
+app.post('/api/agents/web-search/search', async (req, res) => {
+  try {
+    const { query, toolName, limit } = req.body;
+    if (!query) {
+      res.status(400).json({ error: 'Query is required' });
+      return;
+    }
+    const result = await searchChangelogs(query, toolName, limit);
+    res.json(result);
+  } catch (error) {
+    console.error('Changelog search error:', error);
+    res.status(500).json({ error: 'Failed to search changelogs' });
   }
 });
 
