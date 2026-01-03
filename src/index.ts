@@ -10,7 +10,7 @@ import {
   webSearchAgent,
   processChangelogs,
   searchChangelogs,
-  comparisonAgent,
+  compareTools,
   recommendationAgent,
   newsletterAgent,
 } from './agents/index.js';
@@ -78,16 +78,19 @@ app.post('/api/agents/web-search/search', async (req, res) => {
 // Comparison Agent endpoint
 app.post('/api/agents/comparison', async (req, res) => {
   try {
-    const { items } = req.body;
-    if (!items || !Array.isArray(items) || items.length < 2) {
-      res.status(400).json({ error: 'At least 2 items are required for comparison' });
+    const { toolNames, items } = req.body;
+    // Support both toolNames (new) and items (legacy) for backward compatibility
+    const tools = toolNames || items;
+    if (!tools || !Array.isArray(tools) || tools.length < 2) {
+      res.status(400).json({ error: 'At least 2 tool names are required for comparison' });
       return;
     }
-    const result = await comparisonAgent(items);
+    const result = await compareTools(tools);
     res.json(result);
   } catch (error) {
     console.error('Comparison agent error:', error);
-    res.status(500).json({ error: 'Failed to perform comparison' });
+    const errorMessage = error instanceof Error ? error.message : 'Failed to perform comparison';
+    res.status(500).json({ error: errorMessage });
   }
 });
 

@@ -97,3 +97,31 @@ export async function listChangelogFiles(): Promise<BlobFile[]> {
   }));
 }
 
+/**
+ * List all available tools that have changelogs in blob storage
+ * Returns an array of tool names extracted from blob paths
+ */
+export async function listAvailableTools(): Promise<string[]> {
+  if (!BLOB_TOKEN) {
+    throw new Error('BLOB_READ_WRITE_TOKEN environment variable is not set');
+  }
+
+  const { blobs } = await list({
+    prefix: `${FOLDER}/`,
+    token: BLOB_TOKEN,
+  });
+
+  // Extract tool names from paths like "dev/toolname/changelog.txt"
+  const toolNames = new Set<string>();
+  
+  for (const blob of blobs) {
+    const pathParts = blob.pathname.split('/');
+    // Path format: "dev/toolname/changelog.txt" or "prod/toolname/changelog.txt"
+    if (pathParts.length >= 3 && pathParts[2] === 'changelog.txt') {
+      toolNames.add(pathParts[1]);
+    }
+  }
+
+  return Array.from(toolNames).sort();
+}
+

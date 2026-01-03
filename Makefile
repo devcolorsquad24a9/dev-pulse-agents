@@ -68,11 +68,11 @@ dev: setup-docker-env ## Start backend and Neon Local database with Docker Compo
 	@echo "$(GREEN)Database will run on: localhost:$(DB_PORT)$(NC)"
 	@echo "$(GREEN)Using Neon Local (connects to Neon cloud database)$(NC)"
 	@echo ""
-	@docker-compose --profile dev up -d backend neon-local
+	@docker compose --profile dev up -d backend neon-local
 
 stop: ## Stop all running Docker Compose services
 	@echo "$(BLUE)🛑 Stopping Docker Compose services...$(NC)"
-	@docker-compose --profile dev down 2>/dev/null && echo "$(GREEN)✅ Stopped Docker Compose services$(NC)" || echo "$(YELLOW)⚠️  No Docker Compose services running$(NC)"
+	@docker compose --profile dev down 2>/dev/null && echo "$(GREEN)✅ Stopped Docker Compose services$(NC)" || echo "$(YELLOW)⚠️  No Docker Compose services running$(NC)"
 
 restart: stop dev ## Restart all services
 
@@ -99,19 +99,19 @@ status: ## Show status of running services
 logs: ## Show Docker Compose logs (use LOGS_SERVICE=backend or LOGS_SERVICE=neon-local for specific service)
 	@if [ -n "$(LOGS_SERVICE)" ]; then \
 		echo "$(BLUE)📋 Showing logs for $(LOGS_SERVICE)...$(NC)"; \
-		docker-compose --profile dev logs $(LOGS_SERVICE); \
+		docker compose --profile dev logs $(LOGS_SERVICE); \
 	else \
 		echo "$(BLUE)📋 Showing all Docker Compose logs...$(NC)"; \
-		docker-compose --profile dev logs; \
+		docker compose --profile dev logs; \
 	fi
 
 logs-follow: ## Follow Docker Compose logs in real-time (use LOGS_SERVICE=backend or LOGS_SERVICE=neon-local for specific service)
 	@if [ -n "$(LOGS_SERVICE)" ]; then \
 		echo "$(BLUE)📋 Following logs for $(LOGS_SERVICE)...$(NC)"; \
-		docker-compose --profile dev logs -f $(LOGS_SERVICE); \
+		docker compose --profile dev logs -f $(LOGS_SERVICE); \
 	else \
 		echo "$(BLUE)📋 Following all Docker Compose logs...$(NC)"; \
-		docker-compose --profile dev logs -f; \
+		docker compose --profile dev logs -f; \
 	fi
 
 logs-help: ## Show log viewing help and API examples
@@ -133,16 +133,16 @@ logs-help: ## Show log viewing help and API examples
 
 docker-down: ## Stop all Docker services and remove containers
 	@echo "$(BLUE)🛑 Stopping Docker services...$(NC)"
-	@docker-compose --profile dev down
+	@docker compose --profile dev down
 
 clean: ## Remove containers, volumes, and built images
 	@echo "$(BLUE)🧹 Cleaning up Docker resources...$(NC)"
-	@docker-compose --profile dev down -v --rmi local 2>/dev/null || true
+	@docker compose --profile dev down -v --rmi local 2>/dev/null || true
 	@echo "$(GREEN)✅ Cleanup complete$(NC)"
 
 build: ## Build Docker images without starting services
 	@echo "$(BLUE)🔨 Building Docker images...$(NC)"
-	@docker-compose --profile dev build
+	@docker compose --profile dev build
 
 pull-vercel-env: ## Pull environment variables from Vercel to .env.local
 	@echo "$(BLUE)📥 Pulling environment variables from Vercel...$(NC)"
