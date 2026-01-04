@@ -2,7 +2,37 @@
 
 Multi-agent workflow system using Vercel AI SDK with Express.js backend
 
-## Overview
+## Frontend (Vercel)
+
+This repo now includes a simple newsletter landing page in `web/` (Next.js App Router). It:
+- Explains the Dev Pulse newsletter/agent concept (from `notes.txt`)
+- Captures **email** (required) plus **name** and **job role** (optional)
+- Stores submissions in Postgres: `id`, `created_at`, `name`, `email`, `job_role`
+
+### Deploy to Vercel
+
+1. Create a new Vercel project pointing at this repo.
+2. In the Vercel project settings, set **Root Directory** to `web`.
+3. Add Vercel Postgres to the project (Storage → Postgres). This will provision and inject the required env vars.
+4. Create the table by running the SQL in `web/db/schema.sql` in your Postgres instance (Vercel Storage query UI works fine).
+
+### Local dev (frontend)
+
+From the repo root:
+
+```bash
+cd web
+npm install
+```
+
+Set a Postgres connection string (for local Postgres, or use Vercel Postgres connection envs). The API route uses `@vercel/postgres` and expects `POSTGRES_URL` to be set.
+
+```bash
+export POSTGRES_URL="postgres://user:pass@host:5432/dbname?sslmode=require"
+npm run dev
+```
+
+## Setup
 
 This project provides a multi-agent system built with the Vercel AI SDK, featuring:
 - **Web Search Agent** - Scrapes tool changelogs, stores them in Vercel Blob, generates embeddings, and enables semantic search across changelogs using pgvector
