@@ -1,0 +1,62 @@
+services:
+  # Neon Database service
+  neon-local:
+    image: neondatabase/neon_local:latest
+    ports:
+      - '5432:5432'
+    # Use env_file to get NEON_API_KEY and NEON_PROJECT_ID
+    env_file:
+      - ./.env.local
+    environment:
+      # Configure Neon Local to connect to preview branch using BRANCH_ID
+      # This tells Neon Local which branch to proxy connections to
+      - BRANCH_ID=br-ancient-hall-ah2z6jbw
+    profiles:
+      - dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend service (Express.js)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      # Mount source for hot reload
+      - ./src:/app/src
+      # Preserve node_modules from container (don't override)
+      - /app/node_modules
+      # Mount dist if you want to see compiled output
+      - ./dist:/app/dist
+    env_file:
+      - ./.env.local
+    environment:
+      - NODE_ENV=development
+      # DATABASE_URL will use Neon Local proxy (neon-local:5432)
+      # Neon Local is configured to proxy to the preview branch
+    ports:
+      - "3000:3000"
+    command: npm run dev
+    stdin_open: true
+    tty: true
+    depends_on:
+      - neon-local
+    # Temporarily removed health check condition to allow backend to start
+    # even if database has connectivity issues
+    profiles:
+      - dev
+
+  # Flyway service for database migrations
+  flyway:
+    image: flyway/flyway:latest
+    volumes:
+      - ./flyway/conf:/flyway/conf
+      - ./flyway/sql:/flyway/sql
+    profiles:
+      - migrations
+    # No network needed - connects directly to remote Neon databases
+    command: ["info"]  # Default command, override when running migrations
+
