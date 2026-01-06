@@ -125,3 +125,98 @@ export async function listAvailableTools(): Promise<string[]> {
   return Array.from(toolNames).sort();
 }
 
+/**
+ * Generate a consistent path for a comparison based on tool names
+ * Sorts tool names to ensure consistent paths regardless of input order
+ */
+function getComparisonPath(toolNames: string[]): string {
+  const sortedNames = [...toolNames].sort();
+  const comparisonKey = sortedNames.join('-');
+  return `${FOLDER}/comparisons/${comparisonKey}/comparison.txt`;
+}
+
+/**
+ * Save or update a comparison file in Vercel Blob storage
+ */
+export async function saveComparisonFile(
+  toolNames: string[],
+  content: string
+): Promise<BlobFile> {
+  if (!BLOB_TOKEN) {
+    throw new Error('BLOB_READ_WRITE_TOKEN environment variable is not set');
+  }
+
+  const pathname = getComparisonPath(toolNames);
+  
+  // Check if file exists
+  try {
+    const existing = await head(pathname, { token: BLOB_TOKEN });
+    if (existing) {
+      // Delete old file before creating new one
+      await del(existing.url, { token: BLOB_TOKEN });
+    }
+  } catch (error) {
+    // File doesn't exist, which is fine
+  }
+
+  // Upload new file
+  const blob = await put(pathname, content, {
+    access: 'public',
+    token: BLOB_TOKEN,
+    contentType: 'text/plain',
+  });
+
+  return {
+    url: blob.url,
+    pathname: blob.pathname,
+    size: 0, // Size not available in PutBlobResult
+    uploadedAt: new Date(), // Use current date
+  };
+}
+
+/**
+ * Get comparison file from blob storage
+ */
+export async function getComparisonFile(toolNames: string[]): Promise<string | null> {
+  if (!BLOB_TOKEN) {
+    throw new Error('BLOB_READ_WRITE_TOKEN environment variable is not set');
+  }
+
+  const pathname = getComparisonPath(toolNames);
+  
+  try {
+    const blob = await head(pathname, { token: BLOB_TOKEN });
+    if (blob) {
+      // Fetch the content
+      const response = await fetch(blob.url);
+      return await response.text();
+    }
+  } catch (error) {
+    // File doesn't exist
+    return null;
+  }
+  
+  return null;
+}
+
+/**
+ * List all comparison files in the current environment folder
+ */
+export async function listComparisonFiles(): Promise<BlobFile[]> {
+  if (!BLOB_TOKEN) {
+    throw new Error('BLOB_READ_WRITE_TOKEN environment variable is not set');
+  }
+
+  const { blobs } = await list({
+    prefix: `${FOLDER}/comparisons/`,
+    token: BLOB_TOKEN,
+  });
+
+  return blobs.map(blob => ({
+    url: blob.url,
+    pathname: blob.pathname,
+    size: blob.size,
+    uploadedAt: blob.uploadedAt,
+  }));
+}
+

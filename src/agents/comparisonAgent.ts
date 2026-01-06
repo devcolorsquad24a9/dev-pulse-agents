@@ -1,86 +1,13 @@
 /**
  * Comparison Agent
- * Compares multiple tools based on their changelogs using a comprehensive rubric
+ * Compares multiple tools based on their changelogs using free-form analysis
  */
 
-import { generateObject } from 'ai';
+import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { z } from 'zod';
-import { getChangelogFile, listAvailableTools } from '../storage/blob.js';
-import { searchChangelogEmbeddings } from '../db/vectorStore.js';
+import { getChangelogFile, listAvailableTools, saveComparisonFile } from '../storage/blob.js';
 import { connectDb, disconnectDb } from '../db/client.js';
-import { storeComparison, getComparison } from '../db/comparisonStore.js';
-import { ComparisonData } from '../types/comparison.js';
-
-// Define Zod schema for structured output matching the comparison rubric
-const comparisonRubricSchema = z.object({
-  speedPerf: z.record(z.string()),
-  reliabilityStability: z.record(z.string()),
-  languageSupport: z.record(z.string()),
-  debugging: z.record(z.string()),
-  extensionsPlugins: z.record(z.string()),
-  aiFeatures: z.record(z.string()),
-  codeEditing: z.record(z.string()),
-  remoteDevContainers: z.record(z.string()),
-  collaboration: z.record(z.string()),
-  integrations: z.record(z.string()),
-  customization: z.record(z.string()),
-  platformSupport: z.record(z.string()),
-  deployment: z.record(z.string()),
-  pricingLicensing: z.record(z.string()),
-  updateFrequency: z.record(z.string()),
-  communitySupport: z.record(z.string()),
-  userInterface: z.record(z.string()),
-  learningCurve: z.record(z.string()),
-  bestFitPersonas: z.record(z.array(z.string())),
-  useCases: z.record(z.string()),
-});
-
-const comparisonDataSchema = z.object({
-  tools: z.array(z.string()),
-  rubric: comparisonRubricSchema,
-  decisionRules: z.string(),
-});
-
-// Rubric categories for semantic search
-const RUBRIC_CATEGORIES = [
-  { key: 'speedPerf', searchTerms: ['speed', 'performance', 'fast', 'slow', 'latency', 'response time', 'optimization'] },
-  { key: 'reliabilityStability', searchTerms: ['reliability', 'stability', 'bug', 'crash', 'error', 'fix', 'stable'] },
-  { key: 'languageSupport', searchTerms: ['language', 'programming language', 'syntax', 'parser', 'TypeScript', 'Python', 'JavaScript'] },
-  { key: 'debugging', searchTerms: ['debug', 'debugger', 'breakpoint', 'inspect', 'troubleshoot'] },
-  { key: 'extensionsPlugins', searchTerms: ['extension', 'plugin', 'marketplace', 'addon', 'package'] },
-  { key: 'aiFeatures', searchTerms: ['AI', 'artificial intelligence', 'machine learning', 'model', 'GPT', 'Claude', 'Copilot', 'autocomplete', 'code generation'] },
-  { key: 'codeEditing', searchTerms: ['autocomplete', 'refactor', 'rename', 'format', 'lint', 'snippet', 'code action'] },
-  { key: 'remoteDevContainers', searchTerms: ['remote', 'container', 'Docker', 'SSH', 'WSL', 'dev container'] },
-  { key: 'collaboration', searchTerms: ['collaboration', 'pair programming', 'share', 'team', 'multiplayer', 'live share'] },
-  { key: 'integrations', searchTerms: ['integration', 'Git', 'CI/CD', 'API', 'webhook', 'service', 'connect'] },
-  { key: 'customization', searchTerms: ['customize', 'theme', 'config', 'settings', 'workflow', 'keybinding', 'preference'] },
-  { key: 'platformSupport', searchTerms: ['platform', 'OS', 'Windows', 'macOS', 'Linux', 'mobile', 'web', 'browser'] },
-  { key: 'deployment', searchTerms: ['deploy', 'cloud', 'local', 'hosting', 'server', 'infrastructure'] },
-  { key: 'pricingLicensing', searchTerms: ['price', 'pricing', 'license', 'subscription', 'free', 'paid', 'cost', 'tier'] },
-  { key: 'updateFrequency', searchTerms: ['update', 'release', 'version', 'changelog', 'patch', 'upgrade', 'maintenance'] },
-  { key: 'communitySupport', searchTerms: ['community', 'support', 'documentation', 'forum', 'discord', 'help', 'tutorial'] },
-  { key: 'userInterface', searchTerms: ['UI', 'UX', 'interface', 'design', 'accessibility', 'theme', 'layout', 'view'] },
-  { key: 'learningCurve', searchTerms: ['learn', 'onboarding', 'tutorial', 'guide', 'documentation', 'easy', 'simple', 'complex'] },
-  { key: 'bestFitPersonas', searchTerms: ['beginner', 'enterprise', 'professional', 'developer', 'team', 'individual', 'student'] },
-  { key: 'useCases', searchTerms: ['use case', 'scenario', 'workflow', 'project', 'application', 'suitable for', 'ideal for'] },
-];
-
-/**
- * Get relevant chunks for a specific rubric category using semantic search
- */
-async function getRelevantChunksForComparison(
-  toolName: string,
-  category: { key: string; searchTerms: string[] }
-): Promise<string[]> {
-  // Create a query from search terms
-  const query = `${category.searchTerms.join(' ')} ${toolName}`;
-  
-  // Search for relevant chunks (limit to top 5 per category to manage token usage)
-  const chunks = await searchChangelogEmbeddings(query, 5, toolName);
-  
-  return chunks.map(chunk => chunk.contentChunk);
-}
+import { storeComparison, getComparisonWithContent } from '../db/comparisonStore.js';
 
 /**
  * Fetch changelog content from blob storage for multiple tools
@@ -101,76 +28,60 @@ async function fetchToolChangelogs(toolNames: string[]): Promise<Map<string, str
 }
 
 /**
- * Generate comparison using LLM with structured output
+ * Generate comparison using LLM with free-form text output
  */
 async function generateComparison(
   changelogData: Map<string, string>,
-  categoryChunks: Map<string, Map<string, string[]>>,
   toolNames: string[]
-): Promise<ComparisonData> {
+): Promise<string> {
   // Build context for each tool
   const toolContexts = toolNames.map(toolName => {
     const fullContent = changelogData.get(toolName) || '';
-    const chunks = categoryChunks.get(toolName) || new Map();
+    // Limit content length to manage token usage (keep first 15000 chars per tool)
+    const truncatedContent = fullContent.length > 15000 
+      ? fullContent.substring(0, 15000) + '\n\n[... content truncated for length ...]'
+      : fullContent;
     
-    // Build category-specific context
-    const categoryContext = RUBRIC_CATEGORIES.map(cat => {
-      const relevantChunks = chunks.get(cat.key) || [];
-      return `## ${cat.key}:\n${relevantChunks.length > 0 ? relevantChunks.join('\n\n') : 'No specific information found for this category.'}`;
-    }).join('\n\n');
-    
-    return `### Tool: ${toolName}\n\nFull Changelog:\n${fullContent.substring(0, 10000)}\n\nCategory-Specific Information:\n${categoryContext}`;
+    return `### Tool: ${toolName}\n\nChangelog:\n${truncatedContent}`;
   }).join('\n\n---\n\n');
 
   const systemPrompt = `You are an expert at analyzing development tools and creating comprehensive comparisons. 
-Analyze the provided changelog information for each tool and create a detailed comparison following the rubric below.
+Analyze the provided changelog information for each tool and create a detailed, well-structured comparison.
 
-For each rubric category, provide:
-- Pros and cons for each tool
-- Specific features, capabilities, or characteristics mentioned in the changelog
-- Tradeoffs and differences between tools
-- If no information is available for a category, use "No information available in changelog"
+Your comparison should:
+- Identify key differences, strengths, and weaknesses of each tool
+- Highlight unique features and capabilities
+- Discuss performance, reliability, and technical aspects
+- Cover user experience, ease of use, and learning curve
+- Address integrations, ecosystem, and community support
+- Provide insights on pricing, licensing, and business model if available
+- Suggest which tool might be better for different use cases and user personas
+- Be thorough, balanced, and evidence-based using information from the changelogs
 
-Rubric Categories:
-1. speedPerf: Performance metrics, speed, responsiveness, optimization
-2. reliabilityStability: Bug fixes, stability improvements, error handling
-3. languageSupport: Programming language support, syntax highlighting, language features
-4. debugging: Debugging tools, breakpoints, inspection capabilities
-5. extensionsPlugins: Extension ecosystem, plugin support, marketplace
-6. aiFeatures: AI-powered features, code generation, intelligent assistance
-7. codeEditing: Code editing features, autocomplete, refactoring, formatting
-8. remoteDevContainers: Remote development, container support, SSH, WSL
-9. collaboration: Team collaboration, pair programming, sharing features
-10. integrations: Third-party integrations, Git, CI/CD, APIs, services
-11. customization: Theming, configuration, workflow customization
-12. platformSupport: Operating system support, platform compatibility
-13. deployment: Deployment options, cloud, local, hosting
-14. pricingLicensing: Pricing models, licensing, subscription tiers
-15. updateFrequency: Release cadence, update patterns, maintenance
-16. communitySupport: Community size, documentation, support resources
-17. userInterface: UI/UX design, accessibility, interface quality
-18. learningCurve: Ease of learning, onboarding, documentation quality
-19. bestFitPersonas: Target users (beginner, enterprise, polyglot, etc.)
-20. useCases: Specific scenarios where each tool excels
+Format your comparison in clear sections with headings. Be comprehensive but concise.`;
 
-Generate decision rules that summarize when to choose each tool based on the comparison.`;
+  const userPrompt = `Compare the following tools based on their changelogs:\n\n${toolContexts}\n\nCreate a comprehensive, well-structured comparison that helps users understand the differences and make informed decisions.`;
 
-  const userPrompt = `Compare the following tools based on their changelogs:\n\n${toolContexts}\n\nCreate a comprehensive comparison following the rubric. For bestFitPersonas, provide an array of persona types (e.g., ["beginner", "enterprise", "polyglot"]).`;
-
-  const result = await generateObject({
+  const result = await generateText({
     model: openai('gpt-4-turbo'),
-    schema: comparisonDataSchema,
     system: systemPrompt,
     prompt: userPrompt,
   });
 
-  return result.object;
+  return result.text;
 }
 
 /**
  * Main function to compare tools
  */
-export async function compareTools(toolNames: string[]): Promise<ComparisonData & { id?: number }> {
+export async function compareTools(toolNames: string[]): Promise<{
+  id: number;
+  toolNames: string[];
+  blobPath: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+}> {
   if (toolNames.length < 2) {
     throw new Error('At least 2 tools are required for comparison');
   }
@@ -181,11 +92,15 @@ export async function compareTools(toolNames: string[]): Promise<ComparisonData 
   try {
     // Check if comparison already exists
     const sortedToolNames = [...toolNames].sort();
-    const existing = await getComparison(sortedToolNames);
+    const existing = await getComparisonWithContent(sortedToolNames);
     if (existing) {
       return {
-        ...existing.comparisonData,
-        id: existing.id,
+        id: existing.result.id,
+        toolNames: existing.result.toolNames,
+        blobPath: existing.result.blobPath,
+        content: existing.content,
+        createdAt: existing.result.createdAt,
+        updatedAt: existing.result.updatedAt,
       };
     }
 
@@ -199,29 +114,28 @@ export async function compareTools(toolNames: string[]): Promise<ComparisonData 
     // Fetch changelogs
     const changelogData = await fetchToolChangelogs(toolNames);
 
-    // Get relevant chunks for each category for each tool
-    const categoryChunks = new Map<string, Map<string, string[]>>();
-    
-    for (const toolName of toolNames) {
-      const toolChunks = new Map<string, string[]>();
-      
-      for (const category of RUBRIC_CATEGORIES) {
-        const chunks = await getRelevantChunksForComparison(toolName, category);
-        toolChunks.set(category.key, chunks);
-      }
-      
-      categoryChunks.set(toolName, toolChunks);
+    // Generate comparison using LLM
+    const comparisonText = await generateComparison(changelogData, toolNames);
+
+    // Save comparison to blob storage
+    const blobFile = await saveComparisonFile(toolNames, comparisonText);
+
+    // Store comparison metadata in database
+    const id = await storeComparison(toolNames, blobFile.pathname);
+
+    // Fetch the stored comparison to return complete data
+    const stored = await getComparisonWithContent(sortedToolNames);
+    if (!stored) {
+      throw new Error('Failed to retrieve stored comparison');
     }
 
-    // Generate comparison using LLM
-    const comparison = await generateComparison(changelogData, categoryChunks, toolNames);
-
-    // Store comparison in database
-    const id = await storeComparison(comparison);
-
     return {
-      ...comparison,
-      id,
+      id: stored.result.id,
+      toolNames: stored.result.toolNames,
+      blobPath: stored.result.blobPath,
+      content: stored.content,
+      createdAt: stored.result.createdAt,
+      updatedAt: stored.result.updatedAt,
     };
   } finally {
     await disconnectDb();
