@@ -13,6 +13,31 @@ export interface BlobFile {
 }
 
 /**
+ * Get a public URL for a blob pathname (if it exists).
+ *
+ * SECURITY:
+ * - Only allows paths within the current environment folder prefix.
+ * - This prevents using arbitrary/untrusted paths to probe blob storage.
+ */
+export async function getBlobUrl(pathname: string): Promise<string | null> {
+  if (!BLOB_TOKEN) {
+    throw new Error('BLOB_READ_WRITE_TOKEN environment variable is not set');
+  }
+
+  const normalized = pathname.trim();
+  if (!normalized.startsWith(`${FOLDER}/`)) {
+    throw new Error('Invalid blob pathname');
+  }
+
+  try {
+    const blob = await head(normalized, { token: BLOB_TOKEN });
+    return blob?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Save or update a changelog file in Vercel Blob storage
  */
 export async function saveChangelogFile(

@@ -16,6 +16,44 @@ This repo now includes a simple newsletter landing page in `web/` (Next.js App R
 3. Add Vercel Postgres to the project (Storage → Postgres). This will provision and inject the required env vars.
 4. Create the table by running the SQL in `web/db/schema.sql` in your Postgres instance (Vercel Storage query UI works fine).
 
+## Backend API (Vercel Serverless Functions)
+
+This repo also supports deploying the backend as **Vercel Serverless Functions** (no Docker needed).
+
+### Deploy to Vercel
+
+Create a *second* Vercel project pointing at this repo, with:
+- **Root Directory**: repo root
+- **Node runtime**: Node 22 (see `vercel.json`)
+
+#### Required environment variables (backend project)
+
+- **Main DB (changelogs/comparisons/newsletter_runs)**:
+  - `DATABASE_URL`
+- **Subscribers DB (PII)**:
+  - `SUBSCRIBERS_DATABASE_URL`
+- **Blob storage**:
+  - `BLOB_READ_WRITE_TOKEN`
+- **LLM**:
+  - `OPENAI_API_KEY`
+- **Email sending** (only needed if `send: true`):
+  - `RESEND_API_KEY`
+  - `NEWSLETTER_FROM`
+  - `NEWSLETTER_CRON_SECRET`
+
+#### Endpoints
+
+- `POST /api/workflows/newsletter/monthly`
+  - Set `{ "dryRun": true }` to preview HTML/text without sending.
+  - Set `{ "send": true, "dryRun": false }` to send (requires header `x-cron-secret`).
+
+### Vercel Cron
+
+Configure a Vercel Cron Job to call:
+- `POST /api/workflows/newsletter/monthly`
+- Header: `x-cron-secret: <NEWSLETTER_CRON_SECRET>`
+- Body: `{"send":true,"dryRun":false,"limit":3}`
+
 ### Local dev (frontend)
 
 From the repo root:

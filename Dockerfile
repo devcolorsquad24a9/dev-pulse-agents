@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ COPY package.json package-lock.json* ./
 
 # Install all dependencies (dev + prod)
 # This ensures dev dependencies are available locally
-RUN npm ci && npm cache clean --force
+RUN npm ci --no-audit --no-fund && npm cache clean --force
 
 # Copy source code and config
 COPY tsconfig.json ./

@@ -5,9 +5,26 @@
 
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import { z } from 'zod';
 import { getChangelogFile, listAvailableTools, saveComparisonFile } from '../storage/blob.js';
 import { connectDb, disconnectDb } from '../db/client.js';
-import { storeComparison, getComparisonWithContent } from '../db/comparisonStore.js';
+import {
+  storeComparison,
+  getComparisonWithContent,
+  updateComparisonRecommendation,
+} from '../db/comparisonStore.js';
+import type { ComparisonRecommendation } from '../types/comparison.js';
+import {
+  formatRecommendationSection,
+  generateRecommendationFromComparison,
+} from './comparisonRecommendation.js';
+
+const ToolNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9-_]*$/, 'Invalid tool name');
 
 /**
  * Fetch changelog content from blob storage for multiple tools
@@ -79,9 +96,14 @@ export async function compareTools(toolNames: string[]): Promise<{
   toolNames: string[];
   blobPath: string;
   content: string;
+  recommendation: ComparisonRecommendation;
   createdAt: Date;
   updatedAt: Date;
 }> {
+  // SECURITY (workspace rule: do not use unvalidated external input in file paths):
+  // Tool names flow into blob path construction; validate/sanitize them up-front.
+  toolNames = z.array(ToolNameSchema).min(2).parse(toolNames);
+
   if (toolNames.length < 2) {
     throw new Error('At least 2 tools are required for comparison');
   }
@@ -94,11 +116,20 @@ export async function compareTools(toolNames: string[]): Promise<{
     const sortedToolNames = [...toolNames].sort();
     const existing = await getComparisonWithContent(sortedToolNames);
     if (existing) {
+      const recommendation =
+        existing.result.recommendation ??
+        (await generateRecommendationFromComparison(existing.content, existing.result.toolNames));
+
+      // Backfill into DB if missing.
+      if (!existing.result.recommendation) {
+        await updateComparisonRecommendation(existing.result.id, recommendation);
+      }
       return {
         id: existing.result.id,
         toolNames: existing.result.toolNames,
         blobPath: existing.result.blobPath,
         content: existing.content,
+        recommendation,
         createdAt: existing.result.createdAt,
         updatedAt: existing.result.updatedAt,
       };
@@ -117,11 +148,18 @@ export async function compareTools(toolNames: string[]): Promise<{
     // Generate comparison using LLM
     const comparisonText = await generateComparison(changelogData, toolNames);
 
+    // Generate a clear "which tool should I use?" recommendation
+    const recommendation = await generateRecommendationFromComparison(comparisonText, toolNames);
+
+    // Persist the recommendation inside the blob content so users can read it inline.
+    const comparisonWithRecommendation =
+      comparisonText.trimEnd() + '\n\n' + formatRecommendationSection(recommendation);
+
     // Save comparison to blob storage
-    const blobFile = await saveComparisonFile(toolNames, comparisonText);
+    const blobFile = await saveComparisonFile(toolNames, comparisonWithRecommendation);
 
     // Store comparison metadata in database
-    const id = await storeComparison(toolNames, blobFile.pathname);
+    const id = await storeComparison(toolNames, blobFile.pathname, recommendation);
 
     // Fetch the stored comparison to return complete data
     const stored = await getComparisonWithContent(sortedToolNames);
@@ -134,6 +172,7 @@ export async function compareTools(toolNames: string[]): Promise<{
       toolNames: stored.result.toolNames,
       blobPath: stored.result.blobPath,
       content: stored.content,
+      recommendation,
       createdAt: stored.result.createdAt,
       updatedAt: stored.result.updatedAt,
     };

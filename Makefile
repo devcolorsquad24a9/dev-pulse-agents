@@ -1,4 +1,4 @@
-.PHONY: help dev stop status setup-docker-env setup-check logs logs-follow logs-help docker-down restart clean build pull-vercel-env add-env-var neon-setup neon-branch-preview-create neon-connection-strings migrate-preview migrate-production migrate-info migrate-clean
+.PHONY: help dev stop status setup-docker-env setup-check logs logs-follow logs-help docker-down restart clean build pull-vercel-env add-env-var neon-setup neon-branch-preview-create neon-connection-strings migrate-preview migrate-production migrate-info migrate-clean migrate-subscribers migrate-subscribers-info
 
 # Default target
 .DEFAULT_GOAL := help
@@ -313,6 +313,30 @@ migrate-info: ## Show migration status for preview branch
 		-v $(PWD)/flyway/sql:/flyway/sql \
 		--env-file .env.preview \
 		flyway/flyway:latest info -configFiles="/flyway/conf/env_preview.conf"
+
+migrate-subscribers: ## Run migrations for the subscribers database
+	@echo "$(BLUE)🔄 Running migrations on subscribers database...$(NC)"
+	@if [ ! -f ".env.subscribers" ]; then \
+		echo "$(YELLOW)❌ .env.subscribers not found$(NC)"; \
+		echo "$(YELLOW)   Create it with: FLYWAY_URL=... FLYWAY_USER=... FLYWAY_PASSWORD=... (pointing at SUBSCRIBERS_DATABASE_URL)$(NC)"; \
+		exit 1; \
+	fi
+	@docker run --rm \
+		-v $(PWD)/flyway/conf:/flyway/conf \
+		-v $(PWD)/flyway/subscribers_sql:/flyway/subscribers_sql \
+		--env-file .env.subscribers \
+		flyway/flyway:latest migrate -configFiles="/flyway/conf/env_subscribers.conf"
+
+migrate-subscribers-info: ## Show migration status for the subscribers database
+	@if [ ! -f ".env.subscribers" ]; then \
+		echo "$(YELLOW)❌ .env.subscribers not found$(NC)"; \
+		exit 1; \
+	fi
+	@docker run --rm \
+		-v $(PWD)/flyway/conf:/flyway/conf \
+		-v $(PWD)/flyway/subscribers_sql:/flyway/subscribers_sql \
+		--env-file .env.subscribers \
+		flyway/flyway:latest info -configFiles="/flyway/conf/env_subscribers.conf"
 
 migrate-clean: ## Clean migration history (use with caution! Development only)
 	@echo "$(YELLOW)⚠️  This will clean migration history. Use only for development!$(NC)"
