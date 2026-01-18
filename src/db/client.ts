@@ -21,21 +21,6 @@ export async function connectDb(): Promise<void> {
   if (!db) {
     throw new Error('Database client not initialized');
   }
-  // Only connect if not already connected
-  // Check if client is ending or already connected
-  if (db._ending) {
-    // Client is ending, create a new one
-    await disconnectDb();
-    const databaseUrl = process.env.DATABASE_URL;
-    if (!databaseUrl) {
-      throw new Error('DATABASE_URL environment variable is not set');
-    }
-    client = new Client({
-      connectionString: databaseUrl,
-    });
-    await client.connect();
-    return;
-  }
   
   // Try to connect, but catch "already connected" error
   try {
@@ -44,6 +29,19 @@ export async function connectDb(): Promise<void> {
     // If already connected, ignore the error
     if (error.message && error.message.includes('already been connected')) {
       // Client is already connected, which is fine
+      return;
+    }
+    // If client is ending, create a new one
+    if (error.message && (error.message.includes('ending') || error.message.includes('ended'))) {
+      await disconnectDb();
+      const databaseUrl = process.env.DATABASE_URL;
+      if (!databaseUrl) {
+        throw new Error('DATABASE_URL environment variable is not set');
+      }
+      client = new Client({
+        connectionString: databaseUrl,
+      });
+      await client.connect();
       return;
     }
     // Re-throw other errors
