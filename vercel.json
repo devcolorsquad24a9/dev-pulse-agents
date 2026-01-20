@@ -4,7 +4,8 @@
     "api/**/*.ts": {
       "runtime": "nodejs22.x"
     }
-  }
+  },
+  "ignoreBuildStep": true
 }
 
 
