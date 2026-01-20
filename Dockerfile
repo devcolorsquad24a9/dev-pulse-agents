@@ -26,5 +26,6 @@ USER nodejs
 EXPOSE 3000
 
 # Default command (can be overridden)
-CMD ["node", "dist/index.js"]
+# Note: With rootDir: "./", src files compile to dist/src/
+CMD ["node", "dist/src/index.js"]
 
