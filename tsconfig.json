@@ -23,7 +23,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*", "api/**/*"],
-  "exclude": ["node_modules", "dist", "web"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "web", "api"]
 }
 
