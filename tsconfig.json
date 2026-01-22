@@ -6,10 +6,6 @@
     "moduleResolution": "NodeNext",
     "rootDir": "./",
     "outDir": "./dist",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./*"]
-    },
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -23,7 +19,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "web", "api"]
+  "include": ["src/**/*", "api/**/*"],
+  "exclude": ["node_modules", "dist", "web"]
 }
 
