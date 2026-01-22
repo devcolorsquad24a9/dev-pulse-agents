@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 
-import { runMonthlyNewsletterWorkflow } from '../../../src/workflows/monthlyNewsletterWorkflow.js';
+import { runMonthlyNewsletterWorkflow } from '@/src/workflows/monthlyNewsletterWorkflow.js';
 
 function requireCronSecret(req: VercelRequest): boolean {
   const expected = process.env.NEWSLETTER_CRON_SECRET;
