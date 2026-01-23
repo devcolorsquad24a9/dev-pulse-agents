@@ -2,9 +2,9 @@
  * Database operations for storing and retrieving comparisons
  */
 
-import { getDbClient } from './client.js';
-import { ComparisonResult, ComparisonRecommendation } from '../types/comparison.js';
-import { getComparisonFile } from '../storage/blob.js';
+import { getDbClient } from './client';
+import { ComparisonResult, ComparisonRecommendation } from '../types/comparison';
+import { getComparisonFile } from '../storage/blob';
 
 /**
  * Store a comparison in the database

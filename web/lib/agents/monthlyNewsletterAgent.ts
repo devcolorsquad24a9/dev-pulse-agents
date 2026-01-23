@@ -17,7 +17,7 @@ import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 
-import type { ComparisonRecommendation } from '../types/comparison.js';
+import type { ComparisonRecommendation } from '../types/comparison';
 
 export type NewsletterTheme = 'dark' | 'light';
 

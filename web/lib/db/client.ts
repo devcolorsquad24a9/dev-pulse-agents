@@ -23,7 +23,8 @@ export async function connectDb(): Promise<void> {
   }
   // Only connect if not already connected
   // Check if client is ending or already connected
-  if (db._ending) {
+  const dbAny = db as any; // Type assertion for private properties
+  if (dbAny._ending) {
     // Client is ending, create a new one
     await disconnectDb();
     const databaseUrl = process.env.DATABASE_URL;

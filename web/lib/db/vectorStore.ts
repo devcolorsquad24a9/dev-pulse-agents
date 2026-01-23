@@ -1,5 +1,5 @@
-import { getDbClient } from './client.js';
-import { generateEmbeddings, chunkText } from '../tools/embeddings.js';
+import { getDbClient } from './client';
+import { generateEmbeddings, chunkText } from '../tools/embeddings';
 
 export interface ChangelogEmbedding {
   id: number;

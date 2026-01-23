@@ -7,7 +7,7 @@
  * - Callers must validate any external input used to filter results.
  */
 
-import { connectSubscribersDb, disconnectSubscribersDb, getSubscribersDbClient } from './subscribersClient.js';
+import { connectSubscribersDb, disconnectSubscribersDb, getSubscribersDbClient } from './subscribersClient';
 
 export interface NewsletterSubscriber {
   id: string;

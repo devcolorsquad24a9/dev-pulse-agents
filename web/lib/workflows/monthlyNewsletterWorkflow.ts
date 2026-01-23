@@ -11,21 +11,21 @@
 
 import { z } from 'zod';
 
-import { connectDb, disconnectDb } from '../db/client.js';
+import { connectDb, disconnectDb } from '../db/client';
 import {
   getComparisonsByIds,
   listComparisons,
   listComparisonsSince,
   getComparisonWithContent,
-} from '../db/comparisonStore.js';
-import { listNewsletterSubscribers } from '../db/newsletterSubscribers.js';
-import { monthlyNewsletterAgent } from '../agents/monthlyNewsletterAgent.js';
+} from '../db/comparisonStore';
+import { listNewsletterSubscribers } from '../db/newsletterSubscribers';
+import { monthlyNewsletterAgent } from '../agents/monthlyNewsletterAgent';
 import {
   generateRecommendationFromComparison,
   stripRecommendationSection,
-} from '../agents/comparisonRecommendation.js';
-import { sendWithResend } from '../tools/email/resend.js';
-import { getLastNewsletterRun, insertNewsletterRun } from '../db/newsletterRuns.js';
+} from '../agents/comparisonRecommendation';
+import { sendWithResend } from '../tools/email/resend';
+import { getLastNewsletterRun, insertNewsletterRun } from '../db/newsletterRuns';
 
 const ThemeSchema = z.enum(['dark', 'light']);
 

@@ -3,10 +3,10 @@
  * Processes changelogs from tools and stores them in vector database
  */
 
-import { scrapeChangelog } from '../tools/scraper.js';
-import { saveChangelogFile, getChangelogFile } from '../storage/blob.js';
-import { storeChangelogEmbeddings, searchChangelogEmbeddings } from '../db/vectorStore.js';
-import { connectDb, disconnectDb } from '../db/client.js';
+import { scrapeChangelog } from '../tools/scraper';
+import { saveChangelogFile, getChangelogFile } from '../storage/blob';
+import { storeChangelogEmbeddings, searchChangelogEmbeddings } from '../db/vectorStore';
+import { connectDb, disconnectDb } from '../db/client';
 import crypto from 'crypto';
 
 export interface ToolConfig {

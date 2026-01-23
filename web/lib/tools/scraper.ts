@@ -1,9 +1,19 @@
 import FirecrawlApp from '@mendable/firecrawl-js';
 import 'dotenv/config';
 
-const app = new FirecrawlApp({ 
-  apiKey: process.env.FIRECRAWL_API_KEY 
-});
+let app: FirecrawlApp | null = null;
+
+function getFirecrawlApp(): FirecrawlApp {
+  if (!app) {
+    if (!process.env.FIRECRAWL_API_KEY) {
+      throw new Error('FIRECRAWL_API_KEY environment variable is not set');
+    }
+    app = new FirecrawlApp({ 
+      apiKey: process.env.FIRECRAWL_API_KEY 
+    });
+  }
+  return app;
+}
 
 export interface ScrapedContent {
   content: string;
@@ -24,7 +34,8 @@ export async function scrapeChangelog(url: string): Promise<ScrapedContent> {
   }
 
   try {
-    const response = await app.scrape(url, {
+    const firecrawlApp = getFirecrawlApp();
+    const response = await firecrawlApp.scrape(url, {
       formats: ['markdown', 'html'],
       onlyMainContent: true, // Focus on main content, ignore nav/footer
     });

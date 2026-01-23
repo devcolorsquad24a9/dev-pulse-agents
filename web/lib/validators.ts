@@ -13,19 +13,25 @@ export const SubscribePayloadSchema = z
     const jobRole = typeof raw.jobRole === "string" ? raw.jobRole.trim() : undefined;
     const email = raw.email.trim().toLowerCase();
 
-    return {
+    const result = {
       name: name && name.length > 0 ? name : undefined,
       email,
       jobRole: jobRole && jobRole.length > 0 ? jobRole : undefined
     };
-  })
-  .pipe(
-    z.object({
-      name: z.string().min(1).max(100).optional(),
-      email: z.string().email().max(254),
-      jobRole: z.string().min(1).max(100).optional()
-    })
-  );
+
+    // Validate transformed values
+    if (result.name && (result.name.length < 1 || result.name.length > 100)) {
+      throw new Error("Name must be between 1 and 100 characters");
+    }
+    if (!result.email || !z.string().email().safeParse(result.email).success || result.email.length > 254) {
+      throw new Error("Invalid email address");
+    }
+    if (result.jobRole && (result.jobRole.length < 1 || result.jobRole.length > 100)) {
+      throw new Error("Job role must be between 1 and 100 characters");
+    }
+
+    return result;
+  });
 
 export type SubscribePayload = z.infer<typeof SubscribePayloadSchema>;
 

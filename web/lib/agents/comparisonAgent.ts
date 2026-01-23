@@ -6,18 +6,18 @@
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
-import { getChangelogFile, listAvailableTools, saveComparisonFile } from '../storage/blob.js';
-import { connectDb, disconnectDb } from '../db/client.js';
+import { getChangelogFile, listAvailableTools, saveComparisonFile } from '../storage/blob';
+import { connectDb, disconnectDb } from '../db/client';
 import {
   storeComparison,
   getComparisonWithContent,
   updateComparisonRecommendation,
-} from '../db/comparisonStore.js';
-import type { ComparisonRecommendation } from '../types/comparison.js';
+} from '../db/comparisonStore';
+import type { ComparisonRecommendation } from '../types/comparison';
 import {
   formatRecommendationSection,
   generateRecommendationFromComparison,
-} from './comparisonRecommendation.js';
+} from './comparisonRecommendation';
 
 const ToolNameSchema = z
   .string()

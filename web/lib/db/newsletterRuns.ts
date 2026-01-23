@@ -6,7 +6,7 @@
  * - No PII stored here.
  */
 
-import { getDbClient } from './client.js';
+import { getDbClient } from './client';
 
 export interface NewsletterRun {
   id: number;
