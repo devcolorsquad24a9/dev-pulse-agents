@@ -19,18 +19,17 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend service (Express.js)
+  # Backend service (Next.js)
   backend:
     build:
       context: .
       dockerfile: Dockerfile
     volumes:
       # Mount source for hot reload
-      - ./src:/app/src
+      - ./web:/app
       # Preserve node_modules from container (don't override)
       - /app/node_modules
-      # Mount dist if you want to see compiled output
-      - ./dist:/app/dist
+      - /app/.next
     env_file:
       - ./.env.local
     environment:
@@ -39,6 +38,7 @@ services:
       # Neon Local is configured to proxy to the preview branch
     ports:
       - "3000:3000"
+    working_dir: /app
     command: npm run dev
     stdin_open: true
     tty: true

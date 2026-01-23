@@ -1,4 +1,15 @@
-web
-web/**
-/web
-/web/**
+# Ignore root-level files that aren't needed for Next.js build
+src/
+dist/
+node_modules/
+*.md
+!web/README.md
+.env.local
+.env.*
+!.env.example
+Dockerfile
+docker-compose.yml
+Makefile
+flyway/
+scripts/
+test-*.sh

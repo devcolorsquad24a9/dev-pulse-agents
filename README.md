@@ -1,30 +1,33 @@
 # dev-pulse-agents
 
-Multi-agent workflow system using Vercel AI SDK with Express.js backend
+Multi-agent workflow system using Vercel AI SDK with Next.js
 
-## Frontend (Vercel)
+## Overview
 
-This repo now includes a simple newsletter landing page in `web/` (Next.js App Router). It:
+This is a Next.js application that includes:
+- **Frontend**: Newsletter landing page (Next.js App Router)
+- **Backend API**: Serverless functions for agents and workflows (Next.js API routes)
+
+### Frontend Features
+
+The newsletter landing page in `web/app/`:
 - Explains the Dev Pulse newsletter/agent concept (from `notes.txt`)
 - Captures **email** (required) plus **name** and **job role** (optional)
 - Stores submissions in Postgres: `id`, `created_at`, `name`, `email`, `job_role`
 
+### Backend API
+
+All backend functionality is now implemented as Next.js API routes in `web/app/api/`:
+- Agent endpoints (`/api/agents/*`)
+- Workflow endpoints (`/api/workflows/*`)
+
 ### Deploy to Vercel
 
-1. Create a new Vercel project pointing at this repo.
-2. In the Vercel project settings, set **Root Directory** to `web`.
+1. Create a Vercel project pointing at this repo.
+2. In the Vercel project settings, set **Root Directory** to `web` (or configure via root `vercel.json`).
 3. Add Vercel Postgres to the project (Storage → Postgres). This will provision and inject the required env vars.
 4. Create the table by running the SQL in `web/db/schema.sql` in your Postgres instance (Vercel Storage query UI works fine).
-
-## Backend API (Vercel Serverless Functions)
-
-This repo also supports deploying the backend as **Vercel Serverless Functions** (no Docker needed).
-
-### Deploy to Vercel
-
-Create a *second* Vercel project pointing at this repo, with:
-- **Root Directory**: repo root
-- **Node runtime**: Node 22 (see `vercel.json`)
+5. Configure **Node runtime**: Node 22 (see `vercel.json`)
 
 #### Required environment variables (backend project)
 
@@ -54,7 +57,7 @@ Configure a Vercel Cron Job to call:
 - Header: `x-cron-secret: <NEWSLETTER_CRON_SECRET>`
 - Body: `{"send":true,"dryRun":false,"limit":3}`
 
-### Local dev (frontend)
+### Local Development
 
 From the repo root:
 
@@ -63,12 +66,25 @@ cd web
 npm install
 ```
 
-Set a Postgres connection string (for local Postgres, or use Vercel Postgres connection envs). The API route uses `@vercel/postgres` and expects `POSTGRES_URL` to be set.
+Set environment variables (see Environment Variables section below). For local development with Docker:
 
 ```bash
-export POSTGRES_URL="postgres://user:pass@host:5432/dbname?sslmode=require"
+# From repo root
+make dev
+```
+
+This starts:
+- Next.js dev server on `http://localhost:3000`
+- Neon Local database proxy on `localhost:5432`
+
+Or run Next.js directly:
+
+```bash
+cd web
 npm run dev
 ```
+
+The app will be available at `http://localhost:3000` with hot reload enabled.
 
 ## Setup
 
@@ -178,7 +194,7 @@ npm run dev
 
 The project uses Docker Compose with two services:
 
-- **backend** - Express.js API server (port 3000)
+- **backend** - Next.js dev server (port 3000)
 - **neon-local** - Neon Local database (port 5432)
 
 ### Available Makefile Commands
@@ -239,7 +255,7 @@ docker-compose --profile dev build
 
 ## API Endpoints
 
-The Express.js backend provides the following endpoints:
+The Next.js API routes provide the following endpoints:
 
 ### Health Check
 ```bash
@@ -350,29 +366,36 @@ curl -X POST http://localhost:3000/api/agents/newsletter \
 ## Project Structure
 
 ```
-src/
-  agents/              # Agent implementations
-    webSearchAgent.ts   # Changelog scraping, storage, and semantic search
-    comparisonAgent.ts # Comparison functionality
-    recommendationAgent.ts # Recommendation functionality
-    newsletterAgent.ts # Newsletter generation
-    index.ts           # Agent exports
-  tools/               # Shared tools
-    scraper.ts         # Firecrawl web scraping
-    embeddings.ts      # OpenAI text embedding generation
-  storage/             # Storage modules
-    blob.ts            # Vercel Blob storage operations
-  db/                  # Database modules
-    client.ts          # PostgreSQL client connection
-    vectorStore.ts     # Vector store operations (pgvector)
-  workflows/           # Workflow definitions (to be added)
-  index.ts             # Express.js server entry point
+web/
+  app/                 # Next.js App Router
+    api/               # API routes (Next.js serverless functions)
+      agents/         # Agent endpoints
+      workflows/      # Workflow endpoints
+    page.tsx          # Frontend pages
+  lib/                # Shared library code
+    agents/           # Agent implementations
+      webSearchAgent.ts   # Changelog scraping, storage, and semantic search
+      comparisonAgent.ts # Comparison functionality
+      recommendationAgent.ts # Recommendation functionality
+      newsletterAgent.ts # Newsletter generation
+      index.ts           # Agent exports
+    tools/            # Shared tools
+      scraper.ts      # Firecrawl web scraping
+      embeddings.ts   # OpenAI text embedding generation
+      email/         # Email utilities
+    storage/          # Storage modules
+      blob.ts        # Vercel Blob storage operations
+    db/              # Database modules
+      client.ts      # PostgreSQL client connection
+      vectorStore.ts # Vector store operations (pgvector)
+    workflows/        # Workflow definitions
+      monthlyNewsletterWorkflow.ts
 flyway/
-  conf/                # Flyway configuration files
-    flyway.conf        # Base configuration
-    env_preview.conf   # Preview branch configuration
+  conf/              # Flyway configuration files
+    flyway.conf      # Base configuration
+    env_preview.conf # Preview branch configuration
     env_production.conf # Production branch configuration
-  sql/                 # Database migration files
+  sql/               # Database migration files
     V1__Enable_pgvector.sql  # Initial migration (pgvector extension)
 ```
 
@@ -490,7 +513,7 @@ make restart
 
 - **Always commit `package-lock.json`**: Ensures consistent dependency versions
 - **Rebuild after dependency changes**: Containers won't pick up new dependencies until rebuilt
-- **Use volumes in dev**: The dev setup mounts your local `src` directory for hot reload
+- **Use volumes in dev**: The dev setup mounts your local `web` directory for hot reload
 - **Environment files**: Use `.env.local` for local development (gitignored)
 
 ## Development
@@ -499,9 +522,10 @@ make restart
 
 ```bash
 # Install dependencies
+cd web
 npm install
 
-# Run development server
+# Run Next.js development server
 npm run dev
 
 # Build for production
@@ -516,7 +540,7 @@ npm run type-check
 
 ### Hot Reload
 
-The Docker development setup uses `tsx watch` which automatically reloads when you change files in the `src/` directory. No need to restart the container for code changes.
+The Docker development setup uses Next.js dev server which automatically reloads when you change files in the `web/` directory. No need to restart the container for code changes.
 
 ## Database
 

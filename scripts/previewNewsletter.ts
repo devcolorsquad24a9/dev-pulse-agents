@@ -3,8 +3,8 @@ import 'dotenv/config';
 import { z } from 'zod';
 import { writeFile } from 'node:fs/promises';
 
-import { monthlyNewsletterAgent } from '../src/agents/monthlyNewsletterAgent.js';
-import { sendWithResend } from '../src/tools/email/resend.js';
+import { monthlyNewsletterAgent } from '../web/lib/agents/monthlyNewsletterAgent.js';
+import { sendWithResend } from '../web/lib/tools/email/resend.js';
 
 const EmailSchema = z.string().email().max(254);
 

@@ -3,17 +3,22 @@ FROM node:22-bookworm-slim
 WORKDIR /app
 
 # Copy package files first (for better caching)
-COPY package.json package-lock.json* ./
+COPY web/package.json web/package-lock.json* ./
 
-# Install all dependencies (dev + prod)
-# This ensures dev dependencies are available locally
+# Install all dependencies
 RUN npm ci --no-audit --no-fund && npm cache clean --force
 
 # Copy source code and config
-COPY tsconfig.json ./
-COPY src ./src
+COPY web/tsconfig.json ./
+COPY web/next.config.mjs ./
+COPY web/postcss.config.mjs ./
+COPY web/tailwind.config.ts ./
+COPY web/app ./app
+COPY web/components ./components
+COPY web/lib ./lib
+COPY web/db ./db
 
-# Build the project
+# Build Next.js application
 RUN npm run build
 
 # Create non-root user for security
@@ -25,7 +30,5 @@ USER nodejs
 
 EXPOSE 3000
 
-# Default command (can be overridden)
-# Note: With rootDir: "./", src files compile to dist/src/
-CMD ["node", "dist/src/index.js"]
-
+# Start Next.js production server
+CMD ["npm", "start"]

@@ -6,5 +6,5 @@
 // Example:
 // export { myWorkflow } from './myWorkflow';
 
-export { runMonthlyNewsletterWorkflow } from './monthlyNewsletterWorkflow.js';
+export { runMonthlyNewsletterWorkflow } from './monthlyNewsletterWorkflow';
 
