@@ -35,3 +35,9 @@ yarn-error.log*
 
 .vercel
 .env*.local
+# Test output files
+comparison-result.json
+changelog.txt
+
+# Debug logs
+.cursor/debug.log
