@@ -4,11 +4,11 @@
   "description": "Multi-agent workflow system using Vercel AI SDK",
   "main": "dist/index.js",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "type-check": "tsc --noEmit"
+    "preview-newsletter": "tsx scripts/previewNewsletter.ts"
   },
   "keywords": [
     "ai",
@@ -19,24 +19,25 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@ai-sdk/anthropic": "^1.0.0",
-    "@ai-sdk/google": "^1.0.0",
-    "@ai-sdk/openai": "^1.0.0",
+    "@ai-sdk/anthropic": "^3.0.23",
+    "@ai-sdk/google": "^3.0.13",
+    "@ai-sdk/openai": "^3.0.18",
     "@mendable/firecrawl-js": "^4.10.0",
     "@vercel/blob": "^2.0.0",
-    "ai": "^4.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.0",
+    "@vercel/node": "^5.5.26",
+    "ai": "^6.0.48",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
     "express": "^4.18.2",
-    "pg": "^8.16.3",
-    "zod": "^3.23.0"
+    "pg": "^8.17.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/node": "^20.11.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.10",
     "@types/pg": "^8.16.0",
-    "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

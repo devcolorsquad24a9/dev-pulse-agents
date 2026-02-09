@@ -14,4 +14,3 @@ coverage
 *.spec.ts
 docker-compose.yml
 Dockerfile
-
