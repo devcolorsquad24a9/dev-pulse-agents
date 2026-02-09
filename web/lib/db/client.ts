@@ -47,6 +47,19 @@ export async function connectDb(): Promise<void> {
       // Client is already connected, which is fine
       return;
     }
+    // If client is ending, create a new one
+    if (error.message && (error.message.includes('ending') || error.message.includes('ended'))) {
+      await disconnectDb();
+      const databaseUrl = process.env.DATABASE_URL;
+      if (!databaseUrl) {
+        throw new Error('DATABASE_URL environment variable is not set');
+      }
+      client = new Client({
+        connectionString: databaseUrl,
+      });
+      await client.connect();
+      return;
+    }
     // Re-throw other errors
     throw error;
   }
